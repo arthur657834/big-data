@@ -51,3 +51,34 @@ storm jar allmycode.jar org.me.MyTopology arg1 arg2 arg3
 2）停止Storm Topology：
 
 storm kill {toponame}
+
+storm 性能测试
+https://github.com/yahoo/storm-perf-test
+代码下载打包
+
+storm jar storm_perf_test-1.0.0-SNAPSHOT-jar-with-dependencies.jar com.yahoo.storm.perftest.Main --ack --bolt 4 --name test -l 1 -n 1 --workers 4 --spout 3 --testTimeSec 900 -c topology.max.spout.pending=1092 --messageSize 10
+
+
+
+ --ackEnabled (--ack)                   : enable acking
+ --ackers ACKERS                        : number of acker bolts to launch per
+                                          topology
+ --boltParallel (--bolt) BOLT           : number of bolts to run in parallel
+ --debug (-d)                           : enable debug
+ --help (-h)                            : print help message
+ --local                                : run in local mode
+ --maxSpoutPending (--maxPending)       : maximum number of pending messages
+ PENDING                                : per spout (only valid if acking is
+                                          enabled)
+ --messageSizeByte (--messageSize) SIZE : size of the messages generated in
+                                          bytes
+ --name (--topologyName) NAME           : base name of the topology (numbers
+                                          may be appended to the end)
+ --numLevels (-l) LEVELS                : number of levels of bolts per topolgy
+ --numTopologies (-n) TOPOLOGIES        : number of topologies to run in
+                                          parallel
+ --numWorkers (--workers) WORKERS       : number of workers to use per topology
+ --pollFreqSec (--pollFreq) POLL        : How often should metrics be collected
+ --spoutParallel (--spout) SPOUT        : number of spouts to run in parallel
+ --testTimeSec (--testTime) TIME        : How long should the benchmark run for.
+
