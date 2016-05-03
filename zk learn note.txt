@@ -1,8 +1,8 @@
 tar xzvf zookeeper-3.4.6.tar.gz 
 cd zookeeper-3.4.6
-cp conf/zoo_sample.cfg  cp conf/zoo.cfg 
+cp conf/zoo_sample.cfg conf/zoo.cfg 
 
-å¯åŠ ï¼š
+¿É¼Ó£º
 dataLogDir=xxx/zookeeper/server1/dataLog
 # The number of snapshots to retain in dataDir
 autopurge.purgeInterval=1
@@ -11,13 +11,13 @@ maxClientCnxns=256
 
 bin/zkServer.sh start
 
-bin/zkCli.sh â€“server 127.0.0.1:2181
+bin/zkCli.sh -server 127.0.0.1:2181
 
-zké›†ç¾¤
+zk¼¯Èº
 
 server.1=127.0.0.1:2888:3888
 server.2=127.0.0.1:2889:3889
 server.3=127.0.0.1:2890:3890
 
-server.id=host:port:portï¼Œidæ˜¯ä¸ºæ¯ä¸ªZookeeperèŠ‚ç‚¹çš„ç¼–å·ï¼Œä¿å­˜åœ¨dataDirç›®å½•ä¸‹çš„myidæ–‡ä»¶ä¸­ï¼Œzoo1~zoo3è¡¨ç¤ºå„ä¸ªZookeeperèŠ‚ç‚¹çš„hostnameï¼Œç¬¬ä¸€ä¸ªportæ˜¯ç”¨äºè¿æ¥leaderçš„ç«¯å£ï¼Œç¬¬äºŒä¸ªportæ˜¯ç”¨äºleaderé€‰ä¸¾çš„ç«¯å£ã€‚
+server.id=host:port:port£¬idÊÇÎªÃ¿¸öZookeeper½ÚµãµÄ±àºÅ£¬±£´æÔÚdataDirÄ¿Â¼ÏÂµÄmyidÎÄ¼şÖĞ£¬zoo1~zoo3±íÊ¾¸÷¸öZookeeper½ÚµãµÄhostname£¬µÚÒ»¸öportÊÇÓÃÓÚÁ¬½ÓleaderµÄ¶Ë¿Ú£¬µÚ¶ş¸öportÊÇÓÃÓÚleaderÑ¡¾ÙµÄ¶Ë¿Ú¡£
 
