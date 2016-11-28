@@ -1,2 +1,71 @@
-U2FsdGVkX19FyNgpipc2BrzCegmo2FNWSw9NgAcACSSKg1BDBTBfutXJ6/t9Rrmh
-tWOZuhZ/vEo=
+-flume:
+ -
+ -a1.sources = r1 r2 r3 r4
+ -a1.sinks = k1 k2 k3 k4
+ -a1.channels = c1 c2 c3 c4
+ -
+ -# Describe/configure the source
+ -a1.sources.r1.type = org.apache.flume.source.http.HTTPSource
+ -a1.sources.r1.port = 443
+ -a1.sources.r1.enableSSL = true
+ -a1.sources.r1.keystore = /opt/uyun.keystore
+ -a1.sources.r1.keystorePassword = uyuncollector
+ -a1.sources.r1.excludeProtocols = SSLv3
+ -a1.sources.r1.channels = c1
+ -a1.sources.r1.contextPath=mobile/v1/data/http
+ -a1.sources.r1.handler=org.apache.flume.source.http.BytesHandler
+ -a1.sources.r1.response=org.apache.flume.source.http.ResponseNull
+ -
+ -# Describe the sink
+ -#a1.sinks.k1.type = logger
+ -a1.sinks.k1.type = org.apache.flume.sink.kafka.KafkaSink
+ -a1.sinks.k1.topic = HttpTopic
+ -a1.sinks.k1.brokerList= 10.10.1.5:9092   #kafka address and port
+ -a1.sinks.k1.requiredAcks = 1
+ -a1.sinks.k1.batchSize = 20
+ -a1.sinks.k1.channel = c1
+ -
+ -# Use a channel which buffers events in memory
+ -a1.channels.c1.type = memory
+ -a1.channels.c1.capacity = 1000
+ -a1.channels.c1.transactionCapacity = 100
+ -
+ -kafka:
+ -
+ -#Copyright (c) Boxcode Studio
+ -#Mon Sep 14 15:04:57 CST 2015
+ -host.name=10.10.1.5
+ -port=9092
+ -socket.request.max.bytes=104857600
+ -num.io.threads=8
+ -log.dirs=/tmp/kafka-logs
+ -socket.send.buffer.bytes=102400
+ -zookeeper.connect=10.10.1.4\:2181/kafka
+ -log.retention.check.interval.ms=300000
+ -log.retention.hours=3
+ -broker.id=0
+ -zookeeper.connection.timeout.ms=6000
+ -num.recovery.threads.per.data.dir=1
+ -socket.receive.buffer.bytes=102400
+ -num.network.threads=3
+ -num.partitions=10
+ -log.segment.bytes=1073741824
+ -log.cleaner.enable=false
+ -
+ -storm:
+ -
+ -nimbus.host: 10.10.1.8
+ -storm.zookeeper.port: 2181
+ -supervisor.slots.ports:
+ -- 6700
+ -- 6701
+ -- 6702
+ -- 6703
+ -nimbus.childopts: -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.ssl=false -Dcom.sun.management.jmxremote.authenticate=false -Djava.rmi.server.hostname=10.10.1.8 -Dcom.sun.management.jmxremote.port=56601 -Xmx1024m -verbose:gc -XX:+PrintGCTimeStamps -XX:+PrintGCDetails
+ -
+ -storm.zookeeper.servers:
+ -- 10.10.1.4
+ -
+ -worker.childopts: -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.ssl=false -Dcom.sun.management.jmxremote.authenticate=false -Djava.rmi.server.hostname=10.10.1.8 -Dcom.sun.management.jmxremote.port=5%ID% -Xms2048m -Xmx2048m -Xmn768m -XX:PermSize=200M  -XX:MaxPermSize=512M -XX:+UseFastAccessorMethods -XX:+UseConcMarkSweepGC -XX:+CMSParallelRemarkEnabled -XX:CMSFullGCsBeforeCompaction=3 -XX:+UseCMSCompactAtFullCollection
+ -
+ -supervisor.childopts: -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.ssl=false -Dcom.sun.management.jmxremote.authenticate=false -Djava.rmi.server.hostname=10.10.1.8 -Dcom.sun.management.jmxremote.port=56602 -Xmx256m -verbose:gc -XX:+PrintGCTimeStamps -XX:+PrintGCDetails

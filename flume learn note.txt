@@ -1,2 +1,679 @@
-U2FsdGVkX19fV+gse2a+Kch1n2MUU4/4L8oVpIvL5+st5bmvEU/Y59kAar7EVcFg
-2pI3o4FEyqg=
+-http://www.aboutyun.com/thread-8917-1-1.html
+ -
+ -flume的特点：
+ -flume是一个分布式、可靠、和高可用的海量日志采集、聚合和传输的系统。支持在日志系统中定制各类数据发送方，用于收集数据;同时，Flume提供对数据进行简单处理，并写到各种数据接受方(比如文本、HDFS、Hbase等)的能力 。
+ -flume的数据流由事件(Event)贯穿始终。事件是Flume的基本数据单位，它携带日志数据(字节数组形式)并且携带有头信息，这些Event由Agent外部的Source生成，当Source捕获事件后会进行特定的格式化，然后Source会把事件推入(单个或多个)Channel中。你可以把Channel看作是一个缓冲区，它将保存事件直到Sink处理完该事件。Sink负责持久化日志或者把事件推向另一个Source。
+ -
+ -flume的可靠性 
+ -当节点出现故障时，日志能够被传送到其他节点上而不会丢失。Flume提供了三种级别的可靠性保障，从强到弱依次分别为：end-to-end（收到数据agent首先将event写到磁盘上，当数据传送成功后，再删除；如果数据发送失败，可以重新发送。），Store on failure（这也是scribe采用的策略，当数据接收方crash时，将数据写到本地，待恢复后，继续发送），Besteffort（数据发送到接收方后，不会进行确认）。
+ -
+ -flume的可恢复性：
+ -还是靠Channel。推荐使用FileChannel，事件持久化在本地文件系统里(性能较差)。 
+ -
+ -flume的一些核心概念：
+ -Agent        使用JVM 运行Flume。每台机器运行一个agent，但是可以在一个agent中包含多个sources和sinks。
+ -Client        生产数据，运行在一个独立的线程。
+ -Source        从Client收集数据，传递给Channel。
+ -Sink        从Channel收集数据，运行在一个独立线程。
+ -Channel        连接 sources 和 sinks ，这个有点像一个队列。
+ -Events        可以是日志记录、 avro 对象等。
+ -
+ -安装
+ -下载http://www.apache.org/dyn/closer.cgi/flume
+ -cp conf/flume-env.sh.template conf/flume-env.sh
+ -修改flume-env.sh 的JAVA_HOME变量
+ -flume-ng version查看是否安装成功
+ -
+ -ex1: avro
+ -Avro可以发送一个给定的文件给Flume，Avro 源使用AVRO RPC机制。
+ -
+ -1)
+ -vi /root/apache-flume-1.6.0-bin/conf/avro.conf
+ - 
+ -a1.sources = r1
+ -a1.sinks = k1
+ -a1.channels = c1
+ - 
+ -# Describe/configure the source
+ -a1.sources.r1.type = avro
+ -a1.sources.r1.channels = c1
+ -a1.sources.r1.bind = 0.0.0.0
+ -a1.sources.r1.port = 4141
+ - 
+ -# Describe the sink
+ -a1.sinks.k1.type = logger
+ - 
+ -# Use a channel which buffers events in memory
+ -a1.channels.c1.type = memory
+ -a1.channels.c1.capacity = 1000
+ -a1.channels.c1.transactionCapacity = 100
+ - 
+ -# Bind the source and sink to the channel
+ -a1.sources.r1.channels = c1
+ -a1.sinks.k1.channel = c1
+ -
+ -2)
+ -echo "hello world" > /root/apache-flume-1.6.0-bin/log.00
+ -
+ -3)
+ -启动服务端
+ -/root/apache-flume-1.6.0-bin/bin/flume-ng agent -c /root/apache-flume-1.6.0-bin/conf/ -f /root/apache-flume-1.6.0-bin/conf/avro.conf -n a1 -Dflume.root.logger=INFO,console
+ -
+ -启动发送端
+ -/root/apache-flume-1.6.0-bin/bin/flume-ng avro-client -c /root/apache-flume-1.6.0-bin/conf/ -H uem.test -p 4141 -F /root/apache-flume-1.6.0-bin/log.00 
+ -
+ -服务端输出以下信息表示成功
+ -2015-07-28 14:46:28,526 (SinkRunner-PollingRunner-DefaultSinkProcessor) [INFO - org.apache.flume.sink.LoggerSink.process(LoggerSink.java:94)] Event: { headers:{} body: 68 65 6C 6C 6F 20 77 6F 72 6C 64                hello world }
+ -
+ -ex2:spool
+ -Spool监测配置的目录下新增的文件，并将文件中的数据读取出来。需要注意两点
+ -1.拷贝到spool目录下的文件不可以再打开编辑。
+ -2.spool目录下不可包含相应的子目录
+ -
+ -1)
+ -vi /root/apache-flume-1.6.0-bin/conf/spool.conf
+ - 
+ -a1.sources = r1
+ -a1.sinks = k1
+ -a1.channels = c1
+ - 
+ -# Describe/configure the source
+ -a1.sources.r1.type = spooldir
+ -a1.sources.r1.channels = c1
+ -a1.sources.r1.spoolDir = /root/apache-flume-1.6.0-bin/logs
+ -a1.sources.r1.fileHeader = true
+ - 
+ -# Describe the sink
+ -a1.sinks.k1.type = logger
+ - 
+ -# Use a channel which buffers events in memory
+ -a1.channels.c1.type = memory
+ -a1.channels.c1.capacity = 1000
+ -a1.channels.c1.transactionCapacity = 100
+ - 
+ -# Bind the source and sink to the channel
+ -a1.sources.r1.channels = c1
+ -a1.sinks.k1.channel = c1
+ -
+ -
+ -2)
+ -mkdir /root/apache-flume-1.6.0-bin/logs
+ -/root/apache-flume-1.6.0-bin/bin/flume-ng agent -c /root/apache-flume-1.6.0-bin/conf/ -f /root/apache-flume-1.6.0-bin/conf/spool.conf -n a1 -Dflume.root.logger=INFO,console
+ -
+ -
+ -3)
+ -echo "spool test1" > /root/apache-flume-1.6.0-bin/logs/spool_text.log
+ -
+ -服务端输出以下信息表示成功
+ -2015-07-28 15:02:42,502 (SinkRunner-PollingRunner-DefaultSinkProcessor) [INFO - org.apache.flume.sink.LoggerSink.process(LoggerSink.java:94)] Event: { headers:{file=/root/apache-flume-1.6.0-bin/logs/spool_text.log} body: 73 70 6F 6F 6C 20 74 65 73 74 31                spool test1 }
+ -
+ -ex3:Exec
+ -EXEC执行一个给定的命令获得输出的源,如果要使用tail命令，必选使得file足够大才能看到输出内容
+ -1)
+ -vi /root/apache-flume-1.6.0-bin/conf/exec_tail.conf
+ - 
+ -a1.sources = r1
+ -a1.sinks = k1
+ -a1.channels = c1
+ - 
+ -# Describe/configure the source
+ -a1.sources.r1.type = exec
+ -a1.sources.r1.channels = c1
+ -a1.sources.r1.command = tail -F /root/apache-flume-1.6.0-bin/log_exec_tail
+ - 
+ -# Describe the sink
+ -a1.sinks.k1.type = logger
+ - 
+ -# Use a channel which buffers events in memory
+ -a1.channels.c1.type = memory
+ -a1.channels.c1.capacity = 1000
+ -a1.channels.c1.transactionCapacity = 100
+ - 
+ -# Bind the source and sink to the channel
+ -a1.sources.r1.channels = c1
+ -a1.sinks.k1.channel = c1 
+ - 
+ -2)
+ -/root/apache-flume-1.6.0-bin/bin/flume-ng agent -c /root/apache-flume-1.6.0-bin/conf/ -f /root/apache-flume-1.6.0-bin/conf/exec_tail.conf -n a1 -Dflume.root.logger=INFO,console
+ -
+ -3)
+ -for i in {1..100};do echo "exec tail$i";done >> /root/apache-flume-1.6.0-bin/log_exec_tail
+ -
+ -服务端输出以下信息表示成功
+ -2015-07-28 15:18:40,840 (SinkRunner-PollingRunner-DefaultSinkProcessor) [INFO - org.apache.flume.sink.LoggerSink.process(LoggerSink.java:94)] Event: { headers:{} body: 65 78 65 63 20 74 61 69 6C 31 30 30             exec tail100 }
+ -
+ -ex4:Syslogtcp
+ -Syslogtcp监听TCP的端口做为数据源
+ -
+ -1)
+ -vi /root/apache-flume-1.6.0-bin/conf/syslog_tcp.conf
+ - 
+ -a1.sources = r1
+ -a1.sinks = k1
+ -a1.channels = c1
+ - 
+ -# Describe/configure the source
+ -a1.sources.r1.type = syslogtcp
+ -a1.sources.r1.port = 5140
+ -a1.sources.r1.host = localhost
+ -a1.sources.r1.channels = c1
+ - 
+ -# Describe the sink
+ -a1.sinks.k1.type = logger
+ - 
+ -# Use a channel which buffers events in memory
+ -a1.channels.c1.type = memory
+ -a1.channels.c1.capacity = 1000
+ -a1.channels.c1.transactionCapacity = 100
+ - 
+ -# Bind the source and sink to the channel
+ -a1.sources.r1.channels = c1
+ -a1.sinks.k1.channel = c1
+ -
+ -2)
+ -/root/apache-flume-1.6.0-bin/bin/flume-ng agent -c /root/apache-flume-1.6.0-bin/conf/ -f /root/apache-flume-1.6.0-bin/conf/syslog_tcp.conf -n a1 -Dflume.root.logger=INFO,console
+ -
+ -3)
+ -echo "hello idoall.org syslog" | nc localhost 5140
+ -
+ -服务端输出以下信息表示成功
+ -2015-07-28 15:24:00,257 (SinkRunner-PollingRunner-DefaultSinkProcessor) [INFO - org.apache.flume.sink.LoggerSink.process(LoggerSink.java:94)] Event: { headers:{Severity=0, flume.syslog.status=Invalid, Facility=0} body: 68 65 6C 6C 6F 20 69 64 6F 61 6C 6C 2E 6F 72 67 hello idoall.org }
+ -
+ -ex5:JSONHandler
+ -1)
+ -vi /root/apache-flume-1.6.0-bin/conf/post_json.conf
+ - 
+ -a1.sources = r1
+ -a1.sinks = k1
+ -a1.channels = c1
+ - 
+ -# Describe/configure the source
+ -a1.sources.r1.type = org.apache.flume.source.http.HTTPSource
+ -a1.sources.r1.port = 8888
+ -a1.sources.r1.channels = c1
+ - 
+ -# Describe the sink
+ -a1.sinks.k1.type = logger
+ - 
+ -# Use a channel which buffers events in memory
+ -a1.channels.c1.type = memory
+ -a1.channels.c1.capacity = 1000
+ -a1.channels.c1.transactionCapacity = 100
+ - 
+ -# Bind the source and sink to the channel
+ -a1.sources.r1.channels = c1
+ -a1.sinks.k1.channel = c1
+ -
+ -2)
+ -/root/apache-flume-1.6.0-bin/bin/flume-ng agent -c /root/apache-flume-1.6.0-bin/conf/ -f /root/apache-flume-1.6.0-bin/conf/post_json.conf -n a1 -Dflume.root.logger=INFO,console
+ -
+ -3)
+ -curl -X POST -d '[{ "headers" :{"a" : "a1","b" : "b1"},"body" : "idoall.org_body"}]' http://localhost:8888
+ -
+ -服务端输出以下信息表示成功
+ -2015-07-28 17:38:32,277 (SinkRunner-PollingRunner-DefaultSinkProcessor) [INFO - org.apache.flume.sink.LoggerSink.process(LoggerSink.java:94)] Event: { headers:{b=b1, a=a1} body: 69 64 6F 61 6C 6C 2E 6F 72 67 5F 62 6F 64 79    idoall.org_body }
+ -
+ -ex6:Hadoop sink
+ -
+ -将hadoop下的jar都上传到flume下
+ -1)
+ -vi /root/apache-flume-1.6.0-bin/conf/hdfs_sink.conf
+ - 
+ -a1.sources = r1
+ -a1.sinks = k1
+ -a1.channels = c1
+ -
+ -# Describe/configure the source
+ -a1.sources.r1.type = syslogtcp
+ -a1.sources.r1.port = 5140
+ -a1.sources.r1.host = localhost
+ -a1.sources.r1.channels = c1
+ -
+ -# Describe the sink
+ -a1.sinks.k1.type = hdfs
+ -a1.sinks.k1.channel = c1
+ -a1.sinks.k1.hdfs.path = hdfs://192.168.0.124:9000/ljtest
+ -a1.sinks.k1.hdfs.filePrefix = Syslog
+ -a1.sinks.k1.hdfs.round = true
+ -a1.sinks.k1.hdfs.roundValue = 10
+ -a1.sinks.k1.hdfs.roundUnit = minute
+ -
+ -# Use a channel which buffers events in memory
+ -a1.channels.c1.type = memory
+ -a1.channels.c1.capacity = 1000
+ -a1.channels.c1.transactionCapacity = 100
+ -
+ -# Bind the source and sink to the channel
+ -a1.sources.r1.channels = c1
+ -a1.sinks.k1.channel = c1
+ -
+ -2)
+ -/root/apache-flume-1.6.0-bin/bin/flume-ng agent -c /root/apache-flume-1.6.0-bin/conf/ -f /root/apache-flume-1.6.0-bin/conf/hdfs_sink.conf -n a1 -Dflume.root.logger=INFO,console
+ -因为执行以上命令的用户是root,而hadoop的目录是hadoop创建的，所有在hadoop赋予ljtest目录权限 hadoop dfs -chmod 777 /ljtest
+ -3)
+ -echo "hello idoall flume -> hadoop testing one" | nc localhost 5140
+ -
+ -服务端输出以下信息表示成功
+ -3)] writeFormat = Writable, UseRawLocalFileSystem = false
+ -2015-08-27 14:43:24,240 (SinkRunner-PollingRunner-DefaultSinkProcessor) [INFO - org.apache.flume.sink.hdfs.BucketWriter.open(BucketWriter.java:234)] Creating hdfs://192.168.0.124:9000/ljtest/Syslog.1440657803760.tmp
+ -
+ -hdfs上有/ljtest/Syslog.1440657803760.tmp
+ -
+ -
+ -ex7:File Roll Sink
+ -
+ -1)
+ -vi /root/apache-flume-1.6.0-bin/conf/file_roll.conf
+ - 
+ -a1.sources = r1
+ -a1.sinks = k1
+ -a1.channels = c1
+ - 
+ -# Describe/configure the source
+ -a1.sources.r1.type = syslogtcp
+ -a1.sources.r1.port = 5555
+ -a1.sources.r1.host = localhost
+ -a1.sources.r1.channels = c1
+ - 
+ -# Describe the sink
+ -a1.sinks.k1.type = file_roll
+ -a1.sinks.k1.sink.directory = /root/logs
+ - 
+ -# Use a channel which buffers events in memory
+ -a1.channels.c1.type = memory
+ -a1.channels.c1.capacity = 1000
+ -a1.channels.c1.transactionCapacity = 100
+ - 
+ -# Bind the source and sink to the channel
+ -a1.sources.r1.channels = c1
+ -a1.sinks.k1.channel = c1
+ -
+ -
+ -2)
+ -/root/apache-flume-1.6.0-bin/bin/flume-ng agent -c /root/apache-flume-1.6.0-bin/conf/ -f /root/apache-flume-1.6.0-bin/conf/file_roll.conf -n a1 -Dflume.root.logger=INFO,console
+ -
+ -3)
+ -echo "hello idoall.org syslog" | nc localhost 5555
+ -echo "hello idoall.org syslog 2" | nc localhost 5555
+ -
+ -/root/logs下没30秒产生一个文件，文件内容为以上发送内容
+ -
+ -
+ -ex8:Replicating Channel Selector
+ -Flume支持Fan out流从一个源到多个通道。有两种模式的Fan out，分别是复制和复用。在复制的情况下，流的事件被发送到所有的配置通道。在复用的情况下，事件被发送到可用的渠道中的一个子集。Fan out流需要指定源和Fan out通道的规则。
+ -
+ -1)
+ -vi /root/apache-flume-1.6.0-bin/conf/replicating_Channel_Selector.conf
+ - 
+ -a1.sources = r1
+ -a1.sinks = k1 k2
+ -a1.channels = c1 c2
+ - 
+ -# Describe/configure the source
+ -a1.sources.r1.type = syslogtcp
+ -a1.sources.r1.port = 5140
+ -a1.sources.r1.host = localhost
+ -a1.sources.r1.channels = c1 c2
+ -a1.sources.r1.selector.type = replicating
+ - 
+ -# Describe the sink
+ -a1.sinks.k1.type = avro
+ -a1.sinks.k1.channel = c1
+ -a1.sinks.k1.hostname = m1              修改hostname
+ -a1.sinks.k1.port = 5555
+ - 
+ -a1.sinks.k2.type = avro
+ -a1.sinks.k2.channel = c2
+ -a1.sinks.k2.hostname = m2
+ -a1.sinks.k2.port = 5555
+ - 
+ -# Use a channel which buffers events in memory
+ -a1.channels.c1.type = memory
+ -a1.channels.c1.capacity = 1000
+ -a1.channels.c1.transactionCapacity = 100
+ - 
+ -a1.channels.c2.type = memory
+ -a1.channels.c2.capacity = 1000
+ -a1.channels.c2.transactionCapacity = 100
+ -
+ -
+ -vi /root/apache-flume-1.6.0-bin/conf/replicating_Channel_Selector_avro.conf
+ - 
+ -a1.sources = r1
+ -a1.sinks = k1
+ -a1.channels = c1
+ - 
+ -# Describe/configure the source
+ -a1.sources.r1.type = avro
+ -a1.sources.r1.channels = c1
+ -a1.sources.r1.bind = 0.0.0.0
+ -a1.sources.r1.port = 5555
+ - 
+ -# Describe the sink
+ -a1.sinks.k1.type = logger
+ - 
+ -# Use a channel which buffers events in memory
+ -a1.channels.c1.type = memory
+ -a1.channels.c1.capacity = 1000
+ -a1.channels.c1.transactionCapacity = 100
+ - 
+ -# Bind the source and sink to the channel
+ -a1.sources.r1.channels = c1
+ -a1.sinks.k1.channel = c1
+ -
+ -2)
+ -m1,m2同时启动以下两个命令
+ -
+ -/root/apache-flume-1.6.0-bin/bin/flume-ng agent -c /root/apache-flume-1.6.0-bin/conf/ -f /root/apache-flume-1.6.0-bin/conf/replicating_Channel_Selector.conf -n a1 -Dflume.root.logger=INFO,console
+ -
+ -/root/apache-flume-1.6.0-bin/bin/flume-ng agent -c /root/apache-flume-1.6.0-bin/conf/ -f /root/apache-flume-1.6.0-bin/conf/replicating_Channel_Selector_avro.conf -n a1 -Dflume.root.logger=INFO,console
+ -
+ -
+ -
+ -3)
+ -echo "hello idoall.org syslog" | nc localhost 5140
+ -
+ -服务端输出以下信息表示成功
+ -
+ -2015-08-28 11:19:08,092 (SinkRunner-PollingRunner-DefaultSinkProcessor) [INFO - org.apache.flume.sink.LoggerSink.process(LoggerSink.java:94)] Event: { headers:{Severity=0, Facility=0, flume.syslog.status=Invalid} body: 68 65 6C 6C 6F 20 69 64 6F 61 6C 6C 2E 6F 72 67 hello idoall.org }
+ -
+ -
+ -ex9:Multiplexing Channel Selector
+ -Multiplexing_Channel_Selector.conf
+ -
+ -1)
+ -vi /root/apache-flume-1.6.0-bin/conf/Multiplexing_Channel_Selector.conf
+ -
+ -a1.sources = r1
+ -a1.sinks = k1 k2
+ -a1.channels = c1 c2
+ - 
+ -# Describe/configure the source
+ -a1.sources.r1.type = org.apache.flume.source.http.HTTPSource
+ -a1.sources.r1.port = 5140
+ -a1.sources.r1.channels = c1 c2
+ -a1.sources.r1.selector.type = multiplexing
+ - 
+ -a1.sources.r1.selector.header = type
+ -#映射允许每个值通道可以重叠。默认值可以包含任意数量的通道。
+ -a1.sources.r1.selector.mapping.baidu = c1
+ -a1.sources.r1.selector.mapping.ali = c2
+ -a1.sources.r1.selector.default = c1
+ - 
+ -# Describe the sink
+ -a1.sinks.k1.type = avro
+ -a1.sinks.k1.channel = c1
+ -a1.sinks.k1.hostname = m1
+ -a1.sinks.k1.port = 5555
+ - 
+ -a1.sinks.k2.type = avro
+ -a1.sinks.k2.channel = c2
+ -a1.sinks.k2.hostname = m2
+ -a1.sinks.k2.port = 5555
+ - 
+ -# Use a channel which buffers events in memory
+ -a1.channels.c1.type = memory
+ -a1.channels.c1.capacity = 1000
+ -a1.channels.c1.transactionCapacity = 100
+ - 
+ -a1.channels.c2.type = memory
+ -a1.channels.c2.capacity = 1000
+ -a1.channels.c2.transactionCapacity = 100
+ -
+ -vi /root/apache-flume-1.6.0-bin/conf/Multiplexing_Channel_Selector_avro.conf
+ - 
+ -a1.sources = r1
+ -a1.sinks = k1
+ -a1.channels = c1
+ - 
+ -# Describe/configure the source
+ -a1.sources.r1.type = avro
+ -a1.sources.r1.channels = c1
+ -a1.sources.r1.bind = 0.0.0.0
+ -a1.sources.r1.port = 5555
+ - 
+ -# Describe the sink
+ -a1.sinks.k1.type = logger
+ - 
+ -# Use a channel which buffers events in memory
+ -a1.channels.c1.type = memory
+ -a1.channels.c1.capacity = 1000
+ -a1.channels.c1.transactionCapacity = 100
+ - 
+ -# Bind the source and sink to the channel
+ -a1.sources.r1.channels = c1
+ -a1.sinks.k1.channel = c1
+ -
+ -2)
+ -
+ -m1,m2同时启动以下两个命令
+ -/root/apache-flume-1.6.0-bin/bin/flume-ng agent -c /root/apache-flume-1.6.0-bin/conf/ -f /root/apache-flume-1.6.0-bin/conf/Multiplexing_Channel_Selector_avro.conf -n a1 -Dflume.root.logger=INFO,console
+ -/root/apache-flume-1.6.0-bin/bin/flume-ng agent -c /root/apache-flume-1.6.0-bin/conf/ -f /root/apache-flume-1.6.0-bin/conf/Multiplexing_Channel_Selector.conf -n a1 -Dflume.root.logger=INFO,console
+ -
+ -
+ -3)
+ -curl -X POST -d '[{ "headers" :{"type" : "baidu"},"body" : "idoall_TEST1"}]' http://localhost:5140 && curl -X POST -d '[{ "headers" :{"type" : "ali"},"body" : "idoall_TEST2"}]' http://localhost:5140 && curl -X POST -d '[{ "headers" :{"type" : "qq"},"body" : "idoall_TEST3"}]' http://localhost:5140
+ -
+ -
+ -14/08/10 14:34:11 INFO sink.LoggerSink: Event: { headers:{type=baidu} body: 69 64 6F 61 6C 6C 5F 54 45 53 54 31             idoall_TEST1 }
+ -14/08/10 14:34:57 INFO sink.LoggerSink: Event: { headers:{type=qq} body: 69 64 6F 61 6C 6C 5F 54 45 53 54 33             idoall_TEST3 }
+ -
+ -根据header中不同的条件分布到不同的channel上
+ -
+ -
+ -没有尝试成功
+ -
+ -ex10:
+ -Flume Sink Processors
+ -failover的机器是一直发送给其中一个sink，当这个sink不可用的时候，自动发送到下一个sink
+ -
+ -1)
+ -
+ -vi /root/apache-flume-1.6.0-bin/conf/Flume_Sink_Processors.conf
+ -
+ -a1.sources = r1
+ -a1.sinks = k1 k2
+ -a1.channels = c1 c2
+ - 
+ -#这个是配置failover的关键，需要有一个sink group
+ -a1.sinkgroups = g1
+ -a1.sinkgroups.g1.sinks = k1 k2
+ -#处理的类型是failover
+ -a1.sinkgroups.g1.processor.type = failover
+ -#优先级，数字越大优先级越高，每个sink的优先级必须不相同
+ -a1.sinkgroups.g1.processor.priority.k1 = 5
+ -a1.sinkgroups.g1.processor.priority.k2 = 10
+ -#设置为10秒，当然可以根据你的实际状况更改成更快或者很慢
+ -a1.sinkgroups.g1.processor.maxpenalty = 10000
+ - 
+ -# Describe/configure the source
+ -a1.sources.r1.type = syslogtcp
+ -a1.sources.r1.port = 5140
+ -a1.sources.r1.channels = c1 c2
+ -a1.sources.r1.selector.type = replicating
+ - 
+ - 
+ -# Describe the sink
+ -a1.sinks.k1.type = avro
+ -a1.sinks.k1.channel = c1
+ -a1.sinks.k1.hostname = m1
+ -a1.sinks.k1.port = 5555
+ - 
+ -a1.sinks.k2.type = avro
+ -a1.sinks.k2.channel = c2
+ -a1.sinks.k2.hostname = m2
+ -a1.sinks.k2.port = 5555
+ - 
+ -# Use a channel which buffers events in memory
+ -a1.channels.c1.type = memory
+ -a1.channels.c1.capacity = 1000
+ -a1.channels.c1.transactionCapacity = 100
+ - 
+ -a1.channels.c2.type = memory
+ -a1.channels.c2.capacity = 1000
+ -a1.channels.c2.transactionCapacity = 100
+ -
+ -vi /root/apache-flume-1.6.0-bin/conf/Flume_Sink_Processors_avro.conf
+ - 
+ -a1.sources = r1
+ -a1.sinks = k1
+ -a1.channels = c1
+ - 
+ -# Describe/configure the source
+ -a1.sources.r1.type = avro
+ -a1.sources.r1.channels = c1
+ -a1.sources.r1.bind = 0.0.0.0
+ -a1.sources.r1.port = 5555
+ - 
+ -# Describe the sink
+ -a1.sinks.k1.type = logger
+ - 
+ -# Use a channel which buffers events in memory
+ -a1.channels.c1.type = memory
+ -a1.channels.c1.capacity = 1000
+ -a1.channels.c1.transactionCapacity = 100
+ - 
+ -# Bind the source and sink to the channel
+ -a1.sources.r1.channels = c1
+ -a1.sinks.k1.channel = c1
+ -
+ -2)
+ -
+ -m1,m2同时启动以下两个命令
+ -/root/apache-flume-1.6.0-bin/bin/flume-ng agent -c /root/apache-flume-1.6.0-bin/conf/ -f /root/apache-flume-1.6.0-bin/conf/Flume_Sink_Processors.conf -n a1 -Dflume.root.logger=INFO,console
+ -/root/apache-flume-1.6.0-bin/bin/flume-ng agent -c /root/apache-flume-1.6.0-bin/conf/ -f /root/apache-flume-1.6.0-bin/conf/Flume_Sink_Processors_avro.conf -n a1 -Dflume.root.logger=INFO,console
+ -
+ -
+ -3}
+ -
+ -echo "idoall.org test1 failover" | nc localhost 5140
+ -
+ -服务端输出以下信息表示成功
+ -2015-08-29 16:21:25,836 (SinkRunner-PollingRunner-DefaultSinkProcessor) [INFO - org.apache.flume.sink.LoggerSink.process(LoggerSink.java:94)] Event: { headers:{Severity=0, Facility=0, flume.syslog.status=Invalid} body: 69 64 6F 61 6C 6C 2E 6F 72 67 20 74 65 73 74 31 idoall.org test1 }
+ -
+ -ex11
+ -Load balancing Sink Processor
+ -load balance type和failover不同的地方是，load balance有两个配置，一个是轮询，一个是随机。两种情况下如果被选择的sink不可用，就会自动尝试发送到下一个可用的sink上面。
+ -
+ -1)
+ -vi /root/apache-flume-1.6.0-bin/conf/Load_balancing_Sink_Processors.conf
+ - 
+ -a1.sources = r1
+ -a1.sinks = k1 k2
+ -a1.channels = c1
+ - 
+ -#这个是配置Load balancing的关键，需要有一个sink group
+ -a1.sinkgroups = g1
+ -a1.sinkgroups.g1.sinks = k1 k2
+ -a1.sinkgroups.g1.processor.type = load_balance
+ -a1.sinkgroups.g1.processor.backoff = true
+ -a1.sinkgroups.g1.processor.selector = round_robin
+ - 
+ -# Describe/configure the source
+ -a1.sources.r1.type = syslogtcp
+ -a1.sources.r1.port = 5140
+ -a1.sources.r1.channels = c1
+ - 
+ - 
+ -# Describe the sink
+ -a1.sinks.k1.type = avro
+ -a1.sinks.k1.channel = c1
+ -a1.sinks.k1.hostname = m1
+ -a1.sinks.k1.port = 5555
+ - 
+ -a1.sinks.k2.type = avro
+ -a1.sinks.k2.channel = c1
+ -a1.sinks.k2.hostname = m2
+ -a1.sinks.k2.port = 5555
+ - 
+ -# Use a channel which buffers events in memory
+ -a1.channels.c1.type = memory
+ -a1.channels.c1.capacity = 1000
+ -a1.channels.c1.transactionCapacity = 100
+ -
+ -vi /root/apache-flume-1.6.0-bin/conf/Load_balancing_Sink_Processors_avro.conf
+ - 
+ -a1.sources = r1
+ -a1.sinks = k1
+ -a1.channels = c1
+ - 
+ -# Describe/configure the source
+ -a1.sources.r1.type = avro
+ -a1.sources.r1.channels = c1
+ -a1.sources.r1.bind = 0.0.0.0
+ -a1.sources.r1.port = 5555
+ - 
+ -# Describe the sink
+ -a1.sinks.k1.type = logger
+ - 
+ -# Use a channel which buffers events in memory
+ -a1.channels.c1.type = memory
+ -a1.channels.c1.capacity = 1000
+ -a1.channels.c1.transactionCapacity = 100
+ - 
+ -# Bind the source and sink to the channel
+ -a1.sources.r1.channels = c1
+ -a1.sinks.k1.channel = c1
+ -
+ -2)
+ -m1,m2同时启动以下两个命令
+ -/root/apache-flume-1.6.0-bin/bin/flume-ng agent -c /root/apache-flume-1.6.0-bin/conf/ -f /root/apache-flume-1.6.0-bin/conf/Load_balancing_Sink_Processors_avro.conf -n a1 -Dflume.root.logger=INFO,console
+ -/root/apache-flume-1.6.0-bin/bin/flume-ng agent -c /root/apache-flume-1.6.0-bin/conf/ -f /root/apache-flume-1.6.0-bin/conf/Load_balancing_Sink_Processors.conf -n a1 -Dflume.root.logger=INFO,console
+ -
+ -3)
+ -一行一行输入，输入太快，容易落到一台机器上
+ -echo "idoall.org test1" | nc localhost 5140
+ -echo "idoall.org test2" | nc localhost 5140
+ -echo "idoall.org test3" | nc localhost 5140
+ -echo "idoall.org test4" | nc localhost 5140
+ -
+ -
+ -服务端输出以下信息表示成功
+ -2015-08-29 16:27:54,903 (SinkRunner-PollingRunner-DefaultSinkProcessor) [INFO - org.apache.flume.sink.LoggerSink.process(LoggerSink.java:94)] Event: { headers:{Severity=0, Facility=0, flume.syslog.status=Invalid} body: 69 64 6F 61 6C 6C 2E 6F 72 67 20 74 65 73 74 31 idoall.org test1 }
+ -
+ -ex12
+ -Hbase sink
+ -1)
+ -
+ -复制jar到flume
+ -
+ -确保test_idoall_org表在hbase中已经存在
+ -
+ -vi /root/apache-flume-1.6.0-bin/conf/hbase_simple.conf
+ - 
+ -a1.sources = r1
+ -a1.sinks = k1
+ -a1.channels = c1
+ - 
+ -# Describe/configure the source
+ -a1.sources.r1.type = syslogtcp
+ -a1.sources.r1.port = 5140
+ -a1.sources.r1.host = localhost
+ -a1.sources.r1.channels = c1
+ - 
+ -# Describe the sink
+ -a1.sinks.k1.type = logger
+ -a1.sinks.k1.type = hbase
+ -a1.sinks.k1.table = test_idoall_org
+ -a1.sinks.k1.columnFamily = name
+ -a1.sinks.k1.column = idoall
+ -a1.sinks.k1.serializer =  org.apache.flume.sink.hbase.RegexHbaseEventSerializer
+ -a1.sinks.k1.channel = memoryChannel
+ - 
+ -# Use a channel which buffers events in memory
+ -a1.channels.c1.type = memory
+ -a1.channels.c1.capacity = 1000
+ -a1.channels.c1.transactionCapacity = 100
+ - 
+ -# Bind the source and sink to the channel
+ -a1.sources.r1.channels = c1
+ -a1.sinks.k1.channel = c1
+ -
+ -2)
+ -
+ -/root/apache-flume-1.6.0-bin/bin/flume-ng agent -c /root/apache-flume-1.6.0-bin/conf/ -f /root/apache-flume-1.6.0-bin/conf/hbase_simple.conf -n a1 -Dflume.root.logger=INFO,console
+ -
+ -3)
+ -echo "hello idoall.org from flume" | nc localhost 5140
+ -
+ -查看hbase上是否插入数据

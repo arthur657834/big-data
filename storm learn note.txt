@@ -1,1 +1,83 @@
-U2FsdGVkX19QhHNKGGBx0xavwId8+zKc
+-Storm集群中包含两类节点：主控节点（Master Node）和工作节点（Work Node）。其分别对应的角色如下：
+ -
+ -主控节点（Master Node）上运行一个被称为Nimbus的后台程序，它负责在Storm集群内分发代码，分配任务给工作机器，并且负责监控集群运行状态。Nimbus的作用类似于Hadoop中JobTracker的角色。
+ -每个工作节点（Work Node）上运行一个被称为Supervisor的后台程序。Supervisor负责监听从Nimbus分配给它执行的任务，据此启动或停止执行任务的工作进程。每一个工作进程执行一个Topology的子集；一个运行中的Topology由分布在不同工作节点上的多个工作进程组成。
+ -
+ -快速失败（fail-fast) 无状态（stateless）
+ -
+ -1.storm.yaml配置文件:
+ -
+ -1) storm.zookeeper.servers: Storm集群使用的Zookeeper集群地址，其格式如下：
+ -
+ -storm.zookeeper.servers:
+ -  - "111.222.333.444"
+ -  - "555.666.777.888"
+ -如果Zookeeper集群使用的不是默认端口，那么还需要storm.zookeeper.port选项。
+ -
+ -2) storm.local.dir: Nimbus和Supervisor进程用于存储少量状态，如jars、confs等的本地磁盘目录，需要提前创建该目录并给以足够的访问权限。然后在storm.yaml中配置该目录，如：
+ -
+ -storm.local.dir: "/home/admin/storm/workdir"
+ -3) java.library.path: Storm使用的本地库（ZMQ和JZMQ）加载路径，默认为"/usr/local/lib:/opt/local/lib:/usr/lib"，一般来说ZMQ和JZMQ默认安装在/usr/local/lib 下，因此不需要配置即可。
+ -
+ -4) nimbus.host: Storm集群Nimbus机器地址，各个Supervisor工作节点需要知道哪个机器是Nimbus，以便下载Topologies的jars、confs等文件，如：
+ -
+ -nimbus.host: "111.222.333.444"
+ -5) supervisor.slots.ports: 对于每个Supervisor工作节点，需要配置该工作节点可以运行的worker数量。每个worker占用一个单独的端口用于接收消息，该配置选项即用于定义哪些端口是可被worker使用的。默认情况下，每个节点上可运行4个workers，分别在6700、6701、6702和6703端口，如：
+ -
+ -supervisor.slots.ports:
+ -    - 6700
+ -    - 6701
+ -    - 6702
+ -    - 6703
+ -
+ -2.启动Storm各个后台进程
+ -以下是启动Storm各个后台进程的方式：
+ -
+ -Nimbus: 在Storm主控节点上运行"bin/storm nimbus >/dev/null 2>&1 &"启动Nimbus后台程序，并放到后台执行；
+ -Supervisor: 在Storm各个工作节点上运行"bin/storm supervisor >/dev/null 2>&1 &"启动Supervisor后台程序，并放到后台执行；
+ -UI: 在Storm主控节点上运行"bin/storm ui >/dev/null 2>&1 &"启动UI后台程序，并放到后台执行，启动后可以通过http://{nimbus host}:8080观察集群的worker资源使用情况、Topologies的运行状态等信息。
+ -注意事项：
+ -
+ -Storm后台进程被启动后，将在Storm安装部署目录下的logs/子目录下生成各个进程的日志文件。
+ -经测试，Storm UI必须和Storm Nimbus部署在同一台机器上，否则UI无法正常工作，因为UI进程会检查本机是否存在Nimbus链接。
+ -为了方便使用，可以将bin/storm加入到系统环境变量中。	
+ -
+ -3.向集群提交任务
+ -1）启动Storm Topology：
+ -
+ -storm jar allmycode.jar org.me.MyTopology arg1 arg2 arg3
+ -其中，allmycode.jar是包含Topology实现代码的jar包，org.me.MyTopology的main方法是Topology的入口，arg1、arg2和arg3为org.me.MyTopology执行时需要传入的参数。
+ -
+ -2）停止Storm Topology：
+ -
+ -storm kill {toponame}
+ -
+ -storm 性能测试
+ -https://github.com/yahoo/storm-perf-test
+ -代码下载打包
+ -
+ -storm jar storm_perf_test-1.0.0-SNAPSHOT-jar-with-dependencies.jar com.yahoo.storm.perftest.Main --ack --bolt 4 --name test -l 1 -n 1 --workers 4 --spout 3 --testTimeSec 900 -c topology.max.spout.pending=1092 --messageSize 10
+ -
+ -
+ -
+ - --ackEnabled (--ack)                   : enable acking
+ - --ackers ACKERS                        : number of acker bolts to launch per
+ -                                          topology
+ - --boltParallel (--bolt) BOLT           : number of bolts to run in parallel
+ - --debug (-d)                           : enable debug
+ - --help (-h)                            : print help message
+ - --local                                : run in local mode
+ - --maxSpoutPending (--maxPending)       : maximum number of pending messages
+ - PENDING                                : per spout (only valid if acking is
+ -                                          enabled)
+ - --messageSizeByte (--messageSize) SIZE : size of the messages generated in
+ -                                          bytes
+ - --name (--topologyName) NAME           : base name of the topology (numbers
+ -                                          may be appended to the end)
+ - --numLevels (-l) LEVELS                : number of levels of bolts per topolgy
+ - --numTopologies (-n) TOPOLOGIES        : number of topologies to run in
+ -                                          parallel
+ - --numWorkers (--workers) WORKERS       : number of workers to use per topology
+ - --pollFreqSec (--pollFreq) POLL        : How often should metrics be collected
+ - --spoutParallel (--spout) SPOUT        : number of spouts to run in parallel
+ - --testTimeSec (--testTime) TIME        : How long should the benchmark run for.

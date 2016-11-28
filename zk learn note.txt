@@ -1,2 +1,22 @@
-U2FsdGVkX1+g7fjC6ZmIy6bTmu5QWtA/xW3hMgPzrzl4SWs3rDGIfiYn5qDCGHXM
-rCbWzcLEoy0=
+-tar xzvf zookeeper-3.4.6.tar.gz 
+ -cd zookeeper-3.4.6
+ -cp conf/zoo_sample.cfg conf/zoo.cfg 
+ -
+ -�ɼӣ�
+ -dataLogDir=xxx/zookeeper/server1/dataLog
+ -# The number of snapshots to retain in dataDir
+ -autopurge.purgeInterval=1
+ -autopurge.snapRetainCount=3
+ -maxClientCnxns=256
+ -
+ -bin/zkServer.sh start
+ -
+ -bin/zkCli.sh -server 127.0.0.1:2181
+ -
+ -zk��Ⱥ
+ -
+ -server.1=127.0.0.1:2888:3888
+ -server.2=127.0.0.1:2889:3889
+ -server.3=127.0.0.1:2890:3890
+ -
+ -server.id=host:port:port��id��Ϊÿ��Zookeeper�ڵ�ı�ţ�������dataDirĿ¼�µ�myid�ļ��У�zoo1~zoo3��ʾ���Zookeeper�ڵ��hostname����һ��port���������leader�Ķ˿ڣ��ڶ���port������leaderѡ�ٵĶ˿ڡ�
